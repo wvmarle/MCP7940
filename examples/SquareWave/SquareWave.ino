@@ -13,11 +13,11 @@
 ** The MCP7940 allows the Multifunction Pin (MFP) to output a square wave based on the 32KHz crystal oscillator.  **
 ** The square wave signal can have the following frequencies:                                                     **
 **                                                                                                                **
-**  1     Hz                                                                                                      **
+**  1.0   Hz                                                                                                      **
 **  4.096kHz                                                                                                      **
 **  8.192kHz                                                                                                      **
 ** 32.768kHz                                                                                                      **
-** 64     Hz                                                                                                      **
+** 64.0   Hz                                                                                                      **
 **                                                                                                                **
 ** If the TRIM value is set this affects the square wave output frequency as well.                                **
 **                                                                                                                **
@@ -30,11 +30,13 @@
 **                                                                                                                **
 ** Vers.  Date       Developer                     Comments                                                       **
 ** ====== ========== ============================= ============================================================== **
+** 1.0.3  2019-01-20 https://github.com/SV-Zanshin Corrected Interrupt vector definition for non-esp32            **
+** 1.0.2  2018-09-24 https://github.com/SV-Zanshin Issue #34 Support for ESP32 Type interrupts                    **
 ** 1.0.1  2018-07-07 https://github.com/SV-Zanshin Added support for 64Hz, changed to use interrupts              **
 ** 1.0.0  2017-07-29 https://github.com/SV-Zanshin Initial coding                                                 **
 **                                                                                                                **
 *******************************************************************************************************************/
-#include <MCP7940.h>                                                          // Include the MCP7940 RTC library  //
+#include "MCP7940.h"                                                          // Include the MCP7940 RTC library  //
 /*******************************************************************************************************************
 ** Declare all program constants and enumerated types                                                             **
 *******************************************************************************************************************/
@@ -53,9 +55,21 @@ volatile uint64_t switches  = 0;                                              //
 /*******************************************************************************************************************
 ** Declare interrupt handler for pin changes to the MFP_PIN                                                       **
 *******************************************************************************************************************/
-ISR (PCINT_vect) {                                                            // Called when pin goes from a low  //
-  switches++;                                                                 // Increment counter                //
-} // of method PCINT_vect                                                     //                                  //
+#ifdef ESP32
+portMUX_TYPE mux = portMUX_INITIALIZER_UNLOCKED;
+void IRAM_ATTR PCINT_vect()
+#else
+void PCINT_vect()
+#endif
+{
+#ifdef ESP32
+  portENTER_CRITICAL_ISR(&mux);
+#endif
+  switches++;
+#ifdef ESP32
+  portENTER_CRITICAL_ISR(&mux);
+#endif
+} // of method PCINT_vect
 
 /*******************************************************************************************************************
 ** Method Setup(). This is an Arduino IDE method which is called upon boot or restart. It is only called one time **
@@ -75,7 +89,7 @@ void setup() {                                                                //
   Serial.print(F(__TIME__));                                                  //                                  //
   Serial.print(F("\n"));                                                      //                                  //
   while (!MCP7940.begin()) {                                                  // Initialize RTC communications    //
-    Serial.println(F("Unable to find MCP7940M. Checking again in 3s."));      // Show error text                  //
+    Serial.println(F("Unable to find MCP7940. Checking again in 3s."));       // Show error text                  //
     delay(3000);                                                              // wait a second                    //
   } // of loop until device is located                                        //                                  //
   Serial.println(F("MCP7940 initialized."));                                  //                                  //
@@ -92,14 +106,14 @@ void setup() {                                                                //
   Serial.print("Date/Time set to ");                                          //                                  //
   DateTime now = MCP7940.now();                                               // get the current time             //
   sprintf(inputBuffer,"%04d-%02d-%02d %02d:%02d:%02d", now.year(),            // Use sprintf() to pretty print    //
-          now.month(), now.day(), now.hour(), now.minute(), now.second());    // date/time with leading zeroes    //
+          now.month(), now.day(), now.hour(), now.minute(), now.second());    // date/time with leading zeros     //
   Serial.println(inputBuffer);                                                // Display the current date/time    //
   pinMode(MFP_PIN,INPUT);                                                     // MCP7940 Alarm MFP digital pin    //
   attachInterrupt(digitalPinToInterrupt(MFP_PIN),PCINT_vect,FALLING);         // Call interrupt when pin changes  //
   pinMode(LED_PIN,OUTPUT);                                                    // Declare built-in LED as output   //
   Serial.println("Setting SQW to 64Hz and linking to LED");                   //                                  //
   MCP7940.setSQWState(true);                                                  // Turn the SQW on                  //
-  MCP7940.setSQWSpeed(Hz64);                                                  // Set the square wave pin          //
+  MCP7940.setSQWSpeed(kHz32);                                                 // Set the square wave pin          //
 } // of method setup()                                                        //                                  //
 /*******************************************************************************************************************
 ** This is the main program for the Arduino IDE, it is an infinite loop and keeps on repeating.                   **
@@ -107,17 +121,17 @@ void setup() {                                                                //
 void loop() {                                                                 //                                  //
   static uint32_t startMillis = millis();                                     // Store the starting time          //
   digitalWrite(LED_PIN,digitalRead(MFP_PIN));                                 // Make LED mirror MFP pin          //
-  if (millis()-startMillis>5000) {                                            // Show results every 10 seconds    //
+  if (millis()-startMillis>10000) {                                           // Show results every 10 seconds    //
     Serial.print("Square Wave changed ");                                     //                                  //
     Serial.print((uint32_t)(switches));                                       //                                  //
-    Serial.print(" times in 5s = ~");                                         //                                  //
-    Serial.print((uint32_t)(switches/5));                                     // Divide by 10 seconds             //
+    Serial.print(" times in 10s = ~");                                        //                                  //
+    Serial.print((uint32_t)(switches/10));                                    // Divide by 10 seconds             //
     Serial.println("Hz");                                                     //                                  //
     startMillis = millis();                                                   // Set time to current time         //
     switches=0;                                                               // reset number of state changes    //
   } // of if-then 10 seconds have elapsed                                     //                                  //
-  if (MCP7940.getSQWState() && millis()>60000) {                              // If 30 seconds have passed and    //
-    Serial.println("Turning off SQW pin after 1 minute.");                    // the SQW is still enable then turn//
+  if (MCP7940.getSQWState() && millis()>60000) {                              // If 60 seconds have passed and    //
+    Serial.println("Turning off SQW pin after 1 minute.");                    // SQW is still enabled then turn   //
     MCP7940.setSQWState(false);                                               // it off. LED will stop blinking   //
   } // of if-then >10s and pin active                                         //                                  //
 } // of method loop()                                                         //----------------------------------//

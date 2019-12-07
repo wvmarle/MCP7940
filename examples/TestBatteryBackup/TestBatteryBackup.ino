@@ -27,6 +27,7 @@
 **                                                                                                                **
 ** Vers.  Date       Developer                     Comments                                                       **
 ** ====== ========== ============================= ============================================================== **
+** 1.0.2  2019-01-20 https://github.com/SV-Zanshin sprintf() text change due to warnings from Travis-CI runs      **
 ** 1.0.1  2017-08-09 https://github.com/SV-Zanshin Cosmetic changes                                               **
 ** 1.0.0  2017-08-05 https://github.com/SV-Zanshin Cloned from SetAndCalibrate                                    **
 **                                                                                                                **
@@ -92,7 +93,6 @@ void loop() {                                                                 //
     digitalWrite(LED_PIN,!digitalRead(LED_PIN));                              // Toggle the LED                   //
     Serial.println();                                                         //                                  //
   } // of if the seconds have changed                                         //                                  //
-  readCommand();                                                              // See if there's incoming data     //
   if (MCP7940.getPowerFail()) {                                               // Check for a power failure        //
     Serial.println(F("Battery power failure detected!\nWaiting for power.."));//                                  //
     while(MCP7940.now().second()==secs);                                      // Loop until clock runs again      //
@@ -103,7 +103,7 @@ void loop() {                                                                 //
     Serial.println(inputBuffer);                                              // Display the current date/time    //
     Serial.print(F("Power restored at "));                                    //                                  //
     now = MCP7940.getPowerUp();                                               // Read when the power restored     //
-    sprintf(inputBuffer,"????-%02d-%02d %02d:%02d:??",                        // Use sprintf() to pretty print    //
+    sprintf(inputBuffer,"xxxx-%02d-%02d %02d:%02d:??",                        // Use sprintf() to pretty print    //
             now.month(), now.day(), now.hour(), now.minute());                // date/time with leading zeros     //
     Serial.println(inputBuffer);                                              // Display the current date/time    //
     MCP7940.clearPowerFail();                                                 // Reset the power fail switch,     //

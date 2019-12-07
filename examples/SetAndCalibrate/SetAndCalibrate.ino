@@ -103,7 +103,7 @@ void readCommand() {                                                          //
       enum commands { SetDate, CalDate, Unknown_Command };                    // of commands enumerated type      //
       commands command;                                                       // declare enumerated type          //
       char workBuffer[10];                                                    // Buffer to hold string compare    //
-      sscanf(inputBuffer,"%s %*",workBuffer);                                 // Parse the string for first word  //
+      sscanf(inputBuffer,"%s %*s",workBuffer);                                // Parse the string for first word  //
       if      (!strcmp(workBuffer,"SETDATE" )) command = SetDate;             // Set command number when found    //
       else if (!strcmp(workBuffer,"CALDATE" )) command = CalDate;             // Set command number when found    //
       else command = Unknown_Command;                                         // Otherwise set to not found       //
@@ -113,7 +113,7 @@ void readCommand() {                                                          //
         ** Set the device time and date                                                                           **
         ***********************************************************************************************************/
         case SetDate:                                                         // Set the RTC date/time            //
-          tokens = sscanf(inputBuffer,"%*s %d-%d-%d %d:%d:%d;",               // Use sscanf() to parse the date/  //
+          tokens = sscanf(inputBuffer,"%*s %hu-%hu-%hu %hu:%hu:%hu;",         // Use sscanf() to parse the date/  //
                           &year,&month,&day,&hour,&minute,&second);           // time into variables              //
           if (tokens!=6)                                                      // Check to see if it was parsed    //
             Serial.print(F("Unable to parse date/time\n"));                   //                                  //
@@ -126,7 +126,7 @@ void readCommand() {                                                          //
         ** Calibrate the RTC and reset the time                                                                   **
         ***********************************************************************************************************/
         case CalDate:                                                         // Calibrate the RTC                //
-          tokens = sscanf(inputBuffer,"%*s %d-%d-%d %d:%d:%d;",               // Use sscanf() to parse the date/  //
+          tokens = sscanf(inputBuffer,"%*s %hu-%hu-%hu %hu:%hu:%hu;",         // Use sscanf() to parse the date/  //
                           &year,&month,&day,&hour,&minute,&second);           // time into variables              //
           if (tokens!=6)                                                      // Check to see if it was parsed    //
             Serial.print(F("Unable to parse date/time\n"));                   //                                  //
