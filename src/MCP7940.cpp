@@ -373,10 +373,9 @@ bool MCP7940_Class::deviceStart()
   _CrystalStatus = readRegisterBit(MCP7940_RTCSEC, MCP7940_ST);            // Get status bit from register
   for (uint8_t j = 0; j < 255; j++)                                        // Loop until changed or overflow
   {
-//    Serial.println(j);
     _OscillatorStatus = readRegisterBit(MCP7940_RTCWKDAY, MCP7940_OSCRUN); // Wait for oscillator to start
     if (_OscillatorStatus) break;                                          // Exit loop on success
-    delay(10);                                                             // Allow oscillator time to start
+    delay(1);                                                              // Allow oscillator time to start
   } // of for-next oscillator loop
   return _OscillatorStatus;
 } // of method deviceStart
@@ -403,18 +402,18 @@ bool MCP7940_Class::deviceStop()
  */
 DateTime MCP7940_Class::now()
 {
-  Wire.beginTransmission(MCP7940_ADDRESS);        // Address the I2C device
-  Wire.write(MCP7940_RTCSEC);                     // Start at specified register
-  Wire.endTransmission();                         // Close transmission
-  Wire.requestFrom(MCP7940_ADDRESS, (uint8_t)7);  // Request 7 bytes of data
-  uint8_t ss = bcd2int(Wire.read() & 0x7F);       // Clear high bit in seconds
-  uint8_t mm = bcd2int(Wire.read() & 0x7F);       // Clear high bit in minutes
-  uint8_t hh = bcd2int(Wire.read() & 0x3F);       // Keep only 6 LSB bits
-  Wire.read();                                    // Ignore Day-Of-Week register
-  uint8_t d = bcd2int(Wire.read()  & 0x3F);       // Clear 2 high bits for day-of-month
-  uint8_t m = bcd2int(Wire.read()  & 0x1F);       // Clear 3 high bits for Month
-  uint16_t y = bcd2int(Wire.read()) + 2000;       // Add 2000 to internal year
-  return DateTime (y, m, d, hh, mm, ss);          // Return class value
+  Wire.beginTransmission(MCP7940_ADDRESS);       // Address the I2C device
+  Wire.write(MCP7940_RTCSEC);                    // Start at specified register
+  _TransmissionStatus = Wire.endTransmission();  // Close transmission
+  Wire.requestFrom(MCP7940_ADDRESS, (uint8_t)7); // Request 7 bytes of data
+  _ss = bcd2int(Wire.read() & 0x7F);             // Clear high bit in seconds
+  _mm = bcd2int(Wire.read() & 0x7F);             // Clear high bit in minutes
+  _hh = bcd2int(Wire.read() & 0x3F);             // Keep only 6 LSB bits
+  Wire.read();                                   // Ignore Day-Of-Week register
+  _d = bcd2int(Wire.read()  & 0x3F);             // Clear 2 high bits for day-of-month
+  _m = bcd2int(Wire.read()  & 0x1F);             // Clear 3 high bits for Month
+  _y = bcd2int(Wire.read()) + 2000;              // Add 2000 to internal year
+  return DateTime (_y, _m, _d, _hh, _mm, _ss);   // Return class value
 } // of method now
 /*!
     @brief   returns the date/time that the power went off
@@ -423,16 +422,16 @@ DateTime MCP7940_Class::now()
  */
 DateTime MCP7940_Class::getPowerDown() 
 {
-  uint8_t min, hr, day, mon;                      // temporary storage
-  Wire.beginTransmission(MCP7940_ADDRESS);        // Address the I2C device
-  Wire.write(MCP7940_PWRDNMIN);                   // Start at specified register
-  _TransmissionStatus = Wire.endTransmission();   // Close transmission
-  Wire.requestFrom(MCP7940_ADDRESS, (uint8_t)4);  // Request 4 bytes of data
-  min = bcd2int(Wire.read() & 0x7F);              // Clear high bit in minutes
-  hr  = bcd2int(Wire.read() & 0x3F);              // Clear all but 6 LSBs
-  day = bcd2int(Wire.read() & 0x3F);              // Clear 2 high bits for day-of-month
-  mon = bcd2int(Wire.read() & 0x1F);              // Clear 3 high bits for Month
-  return DateTime (0, mon, day, hr, min, 0);      // Return class value
+  uint8_t min, hr, day, mon;                     // temporary storage
+  Wire.beginTransmission(MCP7940_ADDRESS);       // Address the I2C device
+  Wire.write(MCP7940_PWRDNMIN);                  // Start at specified register
+  _TransmissionStatus = Wire.endTransmission();  // Close transmission
+  Wire.requestFrom(MCP7940_ADDRESS, (uint8_t)4); // Request 4 bytes of data
+  min = bcd2int(Wire.read() & 0x7F);             // Clear high bit in minutes
+  hr  = bcd2int(Wire.read() & 0x3F);             // Clear all but 6 LSBs
+  day = bcd2int(Wire.read() & 0x3F);             // Clear 2 high bits for day-of-month
+  mon = bcd2int(Wire.read() & 0x1F);             // Clear 3 high bits for Month
+  return DateTime (0, mon, day, hr, min, 0);     // Return class value
 } // of method getPowerDown()
 /*!
     @brief   returns the date/time that the power went back on
@@ -467,9 +466,7 @@ void MCP7940_Class::adjust()
 */
 void MCP7940_Class::adjust(const DateTime& dt)
 {
-//  Serial.println(F("1"));
   deviceStop();                                           // Stop the oscillator
-//  Serial.println(F("2"));
   writeByte(MCP7940_RTCSEC,   int2bcd(dt.second()));      // Write seconds, keep device off
   writeByte(MCP7940_RTCMIN,   int2bcd(dt.minute()));      // Write the minutes value
   writeByte(MCP7940_RTCHOUR,  int2bcd(dt.hour()));        // Also re-sets the 24Hour clock on
@@ -477,11 +474,8 @@ void MCP7940_Class::adjust(const DateTime& dt)
   writeByte(MCP7940_RTCDATE,  int2bcd(dt.day()));         // Write the day of month
   writeByte(MCP7940_RTCMTH,   int2bcd(dt.month()));       // Month, ignore R/O leapyear bit
   writeByte(MCP7940_RTCYEAR,  int2bcd(dt.year() - 2000)); // Write the year
-//  Serial.println(F("3"));
   deviceStart();                                          // Restart the oscillator
-//  Serial.println(F("4"));
   _SetUnixTime = now().unixtime();                        // Store time of last change
-//  Serial.println(F("5"));
 } // of method adjust
 /*!
     @brief   return the weekday number from the RTC
@@ -556,26 +550,70 @@ int8_t MCP7940_Class::calibrate(const int8_t newTrim)
 */
 int8_t MCP7940_Class::calibrate(const DateTime& dt) 
 {
-  int32_t SecDeviation = dt.unixtime() - now().unixtime();     // Get difference in seconds
-  int32_t ExpectedSec  = now().unixtime() - _SetUnixTime;      // Get number of seconds since set
-  int32_t          ppm = 1000000 * SecDeviation / ExpectedSec; // Multiply first to avoid truncation
-  if (ppm > 130)                                               // Force number ppm to be in range
-  {
-    ppm = 130;
-  }
-  else 
-    if (ppm < -130) // check for low out-of-bounds too
-    {
-       ppm = -130;
-    } // of if-then-else ppm out of range
-  int8_t trim = readByte(MCP7940_OSCTRIM); // Read current trim register value
+  int32_t ppm = getPPMDeviation(dt);
+  adjust(dt);								// set the new Date-Time value
+  ppm = constrain(ppm, -130, 130);
+  int16_t trim = readByte(MCP7940_OSCTRIM); // Read current trim register value
   if (trim >> 7)                           // use negative value if necessary
   {                     
     trim = (~0x80 & trim) * -1;
   } // of if-then trim is set
   trim += ppm * 32768 * 60 / 2000000;      // compute the new trim value
+  trim = constrain(trim, -127, 127);       // Clamp to value range                            
   return calibrate((const int8_t)trim);
 } // of method calibrate()
+/*!
+    @brief   Calibrate the MCP7940 if the ppm deviation is < 130 and > -130 else Adjust the datetime.
+    @details If the time had changed significantly (like happens during daylight savings time) then just
+			 adjust the time to be the new time and leave the trim value alone.  One hour deviation in 6 months
+			 is 225 ppm.  If the ppm deviation is within -130 to 130 then assume we are just calibrating
+			 the clock.  
+    @param[in] dt Actual Date/time
+    @return  Returns the trim value
+*/
+int8_t MCP7940_Class::calibrateOrAdjust(const DateTime& dt){
+  int32_t ppm = getPPMDeviation(dt);
+  if ((ppm > 130) || (ppm < -130)){  // calibration is out of range so just set the time  DML 2/5/2019
+	  adjust(dt);
+	  return readByte(MCP7940_OSCTRIM);
+  }else{
+	  return calibrate(dt);
+  }
+}
+/*!
+    @brief   Calculate the ppm deviation since the last time the clock was  the MCP7940 if the ppm deviation is < 130 and > -130 else Adjust the datetime.
+    @details If the time had changed significantly (like happens during daylight savings time) then just
+			 adjust the time to be the new time and leave the trim value alone.  One hour deviation in 6 months
+			 is 225 ppm.  If the ppm deviation is within -130 to 130 then assume we are just calibrating
+			 the clock.  
+    @param[in] dt Actual Date/time
+    @return  Returns Void
+*/
+int32_t MCP7940_Class::getPPMDeviation(const DateTime& dt){
+  int32_t SecDeviation = dt.unixtime() - now().unixtime();     // Get difference in seconds
+  int32_t ExpectedSec  = dt.unixtime() - _SetUnixTime;      // Get number of seconds since set
+  int32_t          ppm = 1000000 * SecDeviation / ExpectedSec; // Multiply first to avoid truncation
+  return ppm;
+}
+
+/*!
+    @brief   Set the time the clock was last calibrated or adjusted.
+    @details Set the internal variable _SetUnixTime.  This is the time the clock was last calibrated or adjusted.  This should only used to testing.  
+    @param[in] aTime is the Unix time to set the time the clock was last calibrated or adjusted to.
+    @return  void
+*/
+void MCP7940_Class::setSetUnixTime(uint32_t aTime){
+	_SetUnixTime = aTime;
+}
+/*!
+    @brief   Get the time the clock was last calibrated or adjusted.
+    @details Returns the internal variable _SetUnixTime.  This is the time the clock was last calibrated or adjusted.  This should only used to testing.  
+    @return  Returns the internal variable _SetUnixTime.
+*/
+uint32_t MCP7940_Class::getSetUnixTime(){
+	return _SetUnixTime;
+}
+
 /*!
     @brief   Calibrate the MCP7940 (overloaded)
     @details When called with one floating point value then that is used as the measured frequency
@@ -588,12 +626,12 @@ int8_t MCP7940_Class::calibrate(const float fMeas)
   uint32_t fIdeal = getSQWSpeed();      // read the current SQW Speed code
   switch (fIdeal)                       // set variable to real SQW speed
   {
-  case 0: fIdeal =    1; break;
-  case 1: fIdeal = 4096; break;
-  case 2: fIdeal = 8192; break;
-  case 4: fIdeal = 64; break;
+  case 0: fIdeal =     1; break;
+  case 1: fIdeal =  4096; break;
+  case 2: fIdeal =  8192; break;
+  case 4: fIdeal =    64; break;
   case 3: fIdeal = 32768;
-          trim   = 0; // Trim is ignored on 32KHz signal
+          trim   =     0; // Trim is ignored on 32KHz signal
           break;
   } // of switch SQWSpeed value
   trim += ((fMeas - (float)fIdeal) * (32768.0 / fIdeal) * 60.0) / 2.0; // Use formula from datasheet
